@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Run Tracker</title>
+    <title>Cyber Run: AI Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,172 +11,191 @@
             theme: {
                 extend: {
                     colors: {
-                        gray: { 900: '#111827', 800: '#1f2937', 700: '#374151' },
-                        blue: { 500: '#3b82f6', 600: '#2563eb' }
+                        gray: { 900: '#0b0f1a', 800: '#161b2a', 700: '#242b3d' },
+                        blue: { 500: '#3b82f6', 600: '#2563eb' },
+                        cyan: { 400: '#22d3ee' }
                     },
-                    boxShadow: {
-                        'neon': '0 0 20px rgba(59, 130, 246, 0.6)',
-                    }
+                    boxShadow: { 'neon': '0 0 20px rgba(59, 130, 246, 0.4)' }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #e5e7eb; }
-        /* 数字用フォント */
-        .font-mono-digit { font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', monospace; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f1a; color: #e5e7eb; }
+        .font-mono-digit { font-family: 'ui-monospace', monospace; letter-spacing: -0.05em; }
+        .progress-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
-<body class="p-4 min-h-screen flex justify-center">
+<body class="p-4 min-h-screen flex justify-center pb-20">
 
     <div class="w-full max-w-md">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">
-                CYBER RUN
-            </h1>
-            <span class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">PRO EDITION</span>
+        <header class="flex justify-between items-end mb-6 mt-4">
+            <div>
+                <h1 class="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
+                    CYBER RUN AI
+                </h1>
+                <p class="text-[9px] text-gray-500 font-bold tracking-[0.2em] uppercase">Performance Tracker</p>
+            </div>
+            <button onclick="copyForGemini()" class="text-[10px] bg-cyan-900/30 text-cyan-400 border border-cyan-800/50 px-3 py-1.5 rounded-full hover:bg-cyan-800/50 transition-all font-bold">
+                ✨ Geminiに相談
+            </button>
         </header>
 
-        <div id="tracker-card" class="bg-gray-800 rounded-3xl p-8 mb-8 shadow-xl text-center border-2 border-transparent transition-all duration-300">
-            <p class="text-xs font-medium text-gray-400 tracking-widest uppercase mb-2">Current Session</p>
-            <div id="timer-display" class="font-mono-digit text-5xl font-black text-white mb-4 tracking-wider" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">
-                00:00:00
+        <div class="bg-gray-800/40 border border-gray-700/50 rounded-3xl p-5 mb-6">
+            <div class="flex justify-between items-end mb-3">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Monthly Goal</p>
+                <p class="text-xs font-bold"><span id="total-month-dist" class="text-cyan-400">0.0</span> / <input type="number" id="goal-input" value="100" class="bg-transparent border-b border-gray-600 w-10 text-center focus:outline-none" onchange="updateGoal()"> km</p>
             </div>
+            <div class="w-full bg-gray-900 rounded-full h-2 overflow-hidden border border-gray-800">
+                <div id="goal-bar" class="progress-bar bg-gradient-to-r from-blue-600 to-cyan-400 h-full w-0"></div>
+            </div>
+            <p id="goal-text" class="text-[9px] text-gray-500 mt-2 text-right">あと --- km で目標達成</p>
+        </div>
+
+        <div id="tracker-card" class="bg-gray-800 rounded-[2.5rem] p-8 mb-6 shadow-2xl border border-gray-700/50 transition-all duration-500 text-center">
+            <div id="timer-display" class="font-mono-digit text-6xl font-black text-white mb-6">00:00:00</div>
             
-            <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-gray-700/50 p-3 rounded-2xl">
-                    <p class="text-[10px] text-gray-400 uppercase mb-1">Distance</p>
-                    <p class="text-2xl font-bold font-mono-digit text-blue-400"><span id="live-dist">0.00</span> <span class="text-sm">km</span></p>
+            <div class="grid grid-cols-2 gap-4 mb-8 text-left">
+                <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-700/30">
+                    <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Distance</p>
+                    <p class="text-2xl font-black font-mono-digit text-white"><span id="live-dist">0.00</span><span class="text-xs ml-1 font-normal text-gray-500">KM</span></p>
                 </div>
-                <div class="bg-gray-700/50 p-3 rounded-2xl">
-                    <p class="text-[10px] text-gray-400 uppercase mb-1">Current Pace</p>
-                    <p class="text-xl font-bold font-mono-digit text-teal-400"><span id="live-pace">-'-"</span></p>
+                <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-700/30">
+                    <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Pace</p>
+                    <p class="text-2xl font-black font-mono-digit text-cyan-400"><span id="live-pace">-'-"</span></p>
                 </div>
             </div>
 
-            <button id="btn-toggle" onclick="toggleTracking()" class="w-full relative overflow-hidden group bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95">
-                <span class="relative z-10">START RUN</span>
-                <div class="absolute inset-0 h-full w-full bg-white/20 scale-0 group-hover:scale-100 transition-transform rounded-2xl duration-300"></div>
-            </button>
-            <p id="gps-status" class="text-[10px] text-gray-500 mt-3 flex items-center justify-center">
-                <span class="inline-block w-2 h-2 bg-gray-500 rounded-full mr-2" id="gps-indicator"></span>
-                <span>Ready to track</span>
-            </p>
-        </div>
-
-        <div class="bg-gray-800/80 backdrop-blur-sm rounded-3xl p-6 mb-6 shadow-lg border border-gray-700">
-            <h2 class="text-sm font-bold text-gray-300 mb-4 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H4zM2 13a1 1 0 011-1h14a1 1 0 110 2H2z" /></svg>
-                SAVE ACTIVITY
-            </h2>
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <input type="date" id="date" class="bg-gray-900 border border-gray-700 text-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                <input type="number" id="distance" step="0.01" placeholder="距離 (km)" class="bg-gray-900 border border-gray-700 text-gray-300 p-3 rounded-xl text-sm font-mono-digit focus:ring-2 focus:ring-blue-500 outline-none">
-                <input type="number" id="duration-min" placeholder="時間 (分)" class="bg-gray-900 border border-gray-700 text-gray-300 p-3 rounded-xl text-sm font-mono-digit col-span-2 focus:ring-2 focus:ring-blue-500 outline-none">
+            <div class="flex gap-3">
+                <button id="btn-toggle" onclick="toggleTracking()" class="flex-[2] bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-xl shadow-lg transition-all active:scale-95">
+                    <span id="btn-text">START</span>
+                </button>
+                <button id="btn-pause" onclick="togglePause()" class="hidden flex-1 bg-gray-700 hover:bg-gray-600 text-white py-5 rounded-2xl font-black text-xs transition-all active:scale-95">
+                    PAUSE
+                </button>
             </div>
-            <button onclick="saveRecord()" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl text-sm font-bold transition-colors">
-                履歴に記録する
-            </button>
         </div>
 
-        <h2 class="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Recent Activity</h2>
-        <div id="history-list" class="space-y-3 pb-12"></div>
+        <div class="px-2">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Activity Logs</h2>
+                <button onclick="clearAllHistory()" class="text-[9px] text-gray-700 hover:text-red-500 uppercase">Clear All</button>
+            </div>
+            <div id="history-list" class="space-y-3"></div>
+        </div>
     </div>
 
     <script>
-        let runs = JSON.parse(localStorage.getItem('runningRecordsPro')) || [];
-        let isTracking = false;
-        let watchId, startTime, timerInterval;
-        let totalDistance = 0;
-        let lastPosition = null;
-        // 音声合成の準備
+        let runs = JSON.parse(localStorage.getItem('cyberRunDataV3')) || [];
+        let isTracking = false, isPaused = false;
+        let watchId, startTime, timerInterval, totalDistance = 0, lastPosition = null;
+        let pausedTime = 0, pauseStartTime = 0;
+        
         const synth = window.speechSynthesis;
+        let preferredVoice = null;
 
         window.onload = () => {
-            document.getElementById('date').valueAsDate = new Date();
+            document.getElementById('goal-input').value = localStorage.getItem('monthlyGoal') || 100;
             renderHistory();
+            updateMonthlyStats();
         };
 
-        // 音声で話す関数
         function speak(text) {
-            if (synth.speaking) { console.error('speechSynthesis.speaking'); return; }
-            if (text !== '') {
-                const utterThis = new SpeechSynthesisUtterance(text);
-                utterThis.lang = 'ja-JP'; // 日本語設定
-                utterThis.rate = 1.0; // 速度
-                utterThis.pitch = 1.0; // 高さ
-                synth.speak(utterThis);
-            }
+            if (synth.speaking) synth.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'ja-JP';
+            utter.rate = 1.0;
+            synth.speak(utter);
         }
 
         function toggleTracking() {
             const btn = document.getElementById('btn-toggle');
-            const btnText = btn.querySelector('span');
+            const btnPause = document.getElementById('btn-pause');
             const card = document.getElementById('tracker-card');
-            const gpsIndicator = document.getElementById('gps-indicator');
 
             if (!isTracking) {
-                // 開始処理
-                if (!navigator.geolocation) return alert("GPS非対応ブラウザです");
+                // 開始
+                speak("計測を開始します。");
+                isTracking = true; isPaused = false;
+                totalDistance = 0; lastPosition = null; startTime = Date.now(); pausedTime = 0;
                 
-                speak("計測を開始します。"); // 音声アナウンス
-
-                startSession();
-                btnText.innerText = "STOP RUN";
-                btn.classList.remove('from-blue-500', 'to-blue-600', 'hover:from-blue-600', 'hover:to-blue-700');
-                btn.classList.add('from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700');
-                card.classList.add('border-blue-500', 'shadow-neon'); // 発光エフェクト
-                gpsIndicator.classList.replace('bg-gray-500', 'bg-green-500');
-                gpsIndicator.classList.add('animate-pulse');
+                timerInterval = setInterval(updateTimer, 1000);
+                startGps();
+                
+                document.getElementById('btn-text').innerText = "FINISH";
+                btn.className = btn.className.replace('bg-blue-600', 'bg-red-500');
+                btnPause.classList.remove('hidden');
+                card.classList.add('shadow-neon', 'border-blue-500/40');
             } else {
-                // 終了処理
+                // 終了
                 stopSession();
-                
-                speak("計測を終了しました。お疲れ様でした。"); // 音声アナウンス
-
-                btnText.innerText = "START RUN";
-                btn.classList.remove('from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700');
-                btn.classList.add('from-blue-500', 'to-blue-600', 'hover:from-blue-600', 'hover:to-blue-700');
-                card.classList.remove('border-blue-500', 'shadow-neon');
-                gpsIndicator.classList.replace('bg-green-500', 'bg-gray-500');
-                gpsIndicator.classList.remove('animate-pulse');
             }
-            isTracking = !isTracking;
         }
 
-        function startSession() {
-            totalDistance = 0;
-            lastPosition = null;
-            startTime = Date.now();
-            document.getElementById('live-dist').innerText = "0.00";
-            document.getElementById('live-pace').innerText = "-'-" + '"';
-            
-            timerInterval = setInterval(updateTimer, 1000);
+        function togglePause() {
+            const btnPause = document.getElementById('btn-pause');
+            if (!isPaused) {
+                // 一時停止
+                isPaused = true;
+                pauseStartTime = Date.now();
+                clearInterval(timerInterval);
+                navigator.geolocation.clearWatch(watchId);
+                btnPause.innerText = "RESUME";
+                btnPause.classList.replace('bg-gray-700', 'bg-blue-600');
+                speak("一時停止します。");
+            } else {
+                // 再開
+                isPaused = false;
+                pausedTime += (Date.now() - pauseStartTime);
+                timerInterval = setInterval(updateTimer, 1000);
+                startGps();
+                btnPause.innerText = "PAUSE";
+                btnPause.classList.replace('bg-blue-600', 'bg-gray-700');
+                speak("計測を再開します。");
+            }
+        }
 
+        function startGps() {
             watchId = navigator.geolocation.watchPosition(updatePosition, 
-                (err) => {
-                    console.error(err);
-                    document.getElementById('gps-status').querySelector('span:last-child').innerText = "GPSエラー: " + err.message;
-                }, 
+                (err) => console.error(err), 
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
-            document.getElementById('gps-status').querySelector('span:last-child').innerText = "GPS信号を受信中...";
         }
 
         function stopSession() {
+            const btn = document.getElementById('btn-toggle');
+            const btnPause = document.getElementById('btn-pause');
+            const card = document.getElementById('tracker-card');
+
             clearInterval(timerInterval);
             navigator.geolocation.clearWatch(watchId);
-            
-            const durationMs = Date.now() - startTime;
+
+            const durationMs = (Date.now() - startTime) - pausedTime;
             const durationMin = (durationMs / 60000);
 
-            document.getElementById('distance').value = totalDistance.toFixed(2);
-            document.getElementById('duration-min').value = durationMin.toFixed(0);
-            document.getElementById('gps-status').querySelector('span:last-child').innerText = "セッション完了";
+            if (totalDistance > 0.01) {
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+                runs.unshift({ id: Date.now(), date: dateStr, distance: totalDistance, duration: durationMin, pace: durationMin/totalDistance });
+                localStorage.setItem('cyberRunDataV3', JSON.stringify(runs));
+                renderHistory();
+                updateMonthlyStats();
+                speak(`お疲れ様でした。走行距離、${totalDistance.toFixed(2)}キロ。記録を保存しました。`);
+            } else {
+                speak("計測を終了しました。");
+            }
+
+            isTracking = false; isPaused = false;
+            document.getElementById('btn-text').innerText = "START";
+            btn.className = btn.className.replace('bg-red-500', 'bg-blue-600');
+            btnPause.classList.add('hidden');
+            btnPause.innerText = "PAUSE";
+            card.classList.remove('shadow-neon', 'border-blue-500/40');
         }
 
         function updateTimer() {
-            const diff = Date.now() - startTime;
+            const diff = (Date.now() - startTime) - pausedTime;
             const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
             const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
             const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
@@ -185,69 +204,70 @@
 
         function updatePosition(position) {
             const { latitude, longitude, accuracy } = position.coords;
-             // 精度インジケータ更新
-             const gpsStatusText = document.getElementById('gps-status').querySelector('span:last-child');
-            if(accuracy < 20) {
-                 gpsStatusText.innerText = `GPS捕捉中 (精度: 高)`;
-                 gpsStatusText.classList.add('text-green-400');
-            } else {
-                 gpsStatusText.innerText = `GPS捕捉中 (精度: 低 ±${Math.round(accuracy)}m)`;
-                 gpsStatusText.classList.remove('text-green-400');
-            }
-
-            if (accuracy > 40) return; // 精度が悪いデータは無視
+            if (accuracy > 40) return; 
 
             if (lastPosition) {
                 const dist = calculateDistance(lastPosition.latitude, lastPosition.longitude, latitude, longitude);
                 totalDistance += dist;
                 document.getElementById('live-dist').innerText = totalDistance.toFixed(2);
-
-                // 現在のペース計算 (直近の移動に基づく簡易計算)
-                const timeElapsedMin = (Date.now() - startTime) / 60000;
-                if(totalDistance > 0.1 && timeElapsedMin > 0) {
-                     const currentPace = timeElapsedMin / totalDistance;
-                     const pMin = Math.floor(currentPace);
-                     const pSec = Math.round((currentPace - pMin) * 60).toString().padStart(2, '0');
-                     document.getElementById('live-pace').innerText = `${pMin}'${pSec}"`;
+                
+                const timeElapsedMin = ((Date.now() - startTime) - pausedTime) / 60000;
+                if(totalDistance > 0.01) {
+                    const pace = timeElapsedMin / totalDistance;
+                    document.getElementById('live-pace').innerText = `${Math.floor(pace)}'${Math.round((pace%1)*60).toString().padStart(2,'0')}"`;
                 }
             }
             lastPosition = { latitude, longitude };
         }
 
-        // ハバーシン公式 (距離計算)
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
+            const dLat = (lat2-lat1)*Math.PI/180;
+            const dLon = (lon2-lon1)*Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-        function toRad(deg) { return deg * (Math.PI/180); }
 
+        // 月間統計の計算
+        function updateMonthlyStats() {
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            const goal = parseFloat(document.getElementById('goal-input').value) || 100;
 
-        function saveRecord() {
-            const date = document.getElementById('date').value;
-            const distance = parseFloat(document.getElementById('distance').value);
-            const duration = parseFloat(document.getElementById('duration-min').value);
+            const monthDist = runs.reduce((sum, run) => {
+                const rDate = new Date(run.id); // 保存時のタイムスタンプを使用
+                if (rDate.getMonth()+1 === currentMonth && rDate.getFullYear() === currentYear) {
+                    return sum + run.distance;
+                }
+                return sum;
+            }, 0);
 
-            if (!date || isNaN(distance) || isNaN(duration) || distance === 0) return alert("有効な距離と時間を入力してください");
-
-            const pace = duration / distance;
-            runs.unshift({ id: Date.now(), date, distance, duration, pace });
-            localStorage.setItem('runningRecordsPro', JSON.stringify(runs));
-            renderHistory();
+            document.getElementById('total-month-dist').innerText = monthDist.toFixed(1);
+            const percent = Math.min((monthDist / goal) * 100, 100);
+            document.getElementById('goal-bar').style.width = percent + '%';
             
-            // 保存完了の小さな音声フィードバック
-            speak("記録を保存しました");
+            const remaining = Math.max(goal - monthDist, 0);
+            document.getElementById('goal-text').innerText = remaining > 0 ? `あと ${remaining.toFixed(1)} km で目標達成` : "目標達成！おめでとうございます！";
         }
 
-        function deleteRecord(id) {
-            if(!confirm("この記録を削除しますか？")) return;
-            runs = runs.filter(r => r.id !== id);
-            localStorage.setItem('runningRecordsPro', JSON.stringify(runs));
-            renderHistory();
+        function updateGoal() {
+            localStorage.setItem('monthlyGoal', document.getElementById('goal-input').value);
+            updateMonthlyStats();
+        }
+
+        // Geminiへのデータコピー
+        function copyForGemini() {
+            const dataString = runs.slice(0, 10).map(r => 
+                `- 日付: ${r.date}, 距離: ${r.distance.toFixed(2)}km, 時間: ${Math.floor(r.duration)}分, ペース: ${Math.floor(r.pace)}'${Math.round((r.pace%1)*60)}"/km`
+            ).join('\n');
+
+            const prompt = `以下の私の最近のランニングデータ（直近10回分）を分析してください。\n\n${dataString}\n\nこのデータを元に、私の走りの傾向の分析と、より効率的に走るための具体的なアドバイスをお願いします。`;
+            
+            navigator.clipboard.writeText(prompt).then(() => {
+                alert("Gemini用のアドバイス依頼文をコピーしました！Geminiに貼り付けて送信してください。");
+                speak("データをコピーしました。ジェミナイに相談してみましょう。");
+            });
         }
 
         function renderHistory() {
@@ -256,24 +276,30 @@
                 const pMin = Math.floor(run.pace);
                 const pSec = Math.round((run.pace - pMin) * 60).toString().padStart(2, '0');
                 return `
-                    <div class="bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-700 flex justify-between items-center hover:border-gray-600 transition-colors">
+                    <div class="bg-gray-800/40 border border-gray-700/30 rounded-2xl p-4 flex justify-between items-center group">
                         <div class="flex items-center">
-                            <div class="bg-blue-900/50 p-3 rounded-xl mr-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            <div class="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mr-3 border border-blue-500/20">
+                                <div class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-400 mb-1">${run.date}</p>
-                                <p class="font-black text-lg text-white font-mono-digit">${run.distance.toFixed(2)} <span class="text-sm font-normal text-gray-400">km</span></p>
+                                <p class="text-[9px] text-gray-500 font-bold">${run.date}</p>
+                                <p class="text-lg font-black text-white font-mono-digit">${run.distance.toFixed(2)}<span class="text-[10px] ml-1 text-gray-500">KM</span></p>
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-sm font-bold text-teal-400 font-mono-digit mb-1">${pMin}'${pSec}"<span class="text-xs">/km</span></p>
-                            <p class="text-xs text-gray-500 mb-2">${run.duration.toFixed(0)} min</p>
-                            <button onclick="deleteRecord(${run.id})" class="text-[10px] text-red-400 hover:text-red-300 py-1 px-2 rounded bg-red-900/20">DELETE</button>
+                            <p class="text-xs font-black text-cyan-400 font-mono-digit">${pMin}'${pSec}"</p>
+                            <button onclick="deleteRecord(${run.id})" class="text-[8px] text-gray-700 hover:text-red-500 uppercase tracking-tighter">Delete</button>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function deleteRecord(id) {
+            if(confirm("削除しますか？")) { runs = runs.filter(r => r.id !== id); localStorage.setItem('cyberRunDataV3', JSON.stringify(runs)); renderHistory(); updateMonthlyStats(); }
+        }
+        function clearAllHistory() {
+            if(confirm("全履歴を消去しますか？")) { runs = []; localStorage.removeItem('cyberRunDataV3'); renderHistory(); updateMonthlyStats(); }
         }
     </script>
 </body>
