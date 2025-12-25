@@ -3,41 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Run: High Precision</title>
+    <title>Cyber Run: Android Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        gray: { 900: '#0b0f1a', 800: '#161b2a', 700: '#242b3d' },
-                        blue: { 500: '#3b82f6', 600: '#2563eb' },
-                        cyan: { 400: '#22d3ee' }
-                    },
-                    boxShadow: { 'neon': '0 0 20px rgba(59, 130, 246, 0.4)' }
-                }
-            }
-        }
-    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #0b0f1a; color: #e5e7eb; touch-action: manipulation; }
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f1a; color: #e5e7eb; }
         .font-mono-digit { font-family: 'ui-monospace', monospace; letter-spacing: -0.05em; }
     </style>
 </head>
-<body class="p-4 min-h-screen flex justify-center pb-20">
+<body class="p-4 min-h-screen flex justify-center pb-24">
 
     <div class="w-full max-w-md">
         <header class="flex justify-between items-end mb-6 mt-4">
             <div>
                 <h1 class="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
-                    CYBER RUN HP
+                    CYBER RUN ANDROID
                 </h1>
-                <div class="flex items-center mt-1">
-                    <div id="accuracy-light" class="w-2 h-2 rounded-full bg-red-500 mr-2 shadow-[0_0_8px_red]"></div>
-                    <p id="accuracy-text" class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">GPS SIGNAL: SEARCHING</p>
-                </div>
+                <p id="accuracy-text" class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">GPS: STANDBY</p>
             </div>
             <button onclick="copyForGemini()" class="text-[10px] bg-cyan-900/30 text-cyan-400 border border-cyan-800/50 px-3 py-1.5 rounded-full font-bold">
                 ✨ Gemini連携
@@ -49,17 +31,17 @@
             
             <div class="grid grid-cols-2 gap-4 mb-8 text-left">
                 <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-700/30">
-                    <p class="text-[9px] text-gray-500 uppercase font-black mb-1 tracking-widest">Distance</p>
-                    <p class="text-2xl font-black font-mono-digit text-white"><span id="live-dist">0.00</span><span class="text-xs ml-1 font-normal text-gray-500 uppercase">km</span></p>
+                    <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Distance</p>
+                    <p class="text-2xl font-black font-mono-digit text-white"><span id="live-dist">0.00</span><span class="text-xs ml-1 font-normal text-gray-500">KM</span></p>
                 </div>
                 <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-700/30">
-                    <p class="text-[9px] text-gray-500 uppercase font-black mb-1 tracking-widest">Pace</p>
+                    <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Pace</p>
                     <p class="text-2xl font-black font-mono-digit text-cyan-400"><span id="live-pace">-'-"</span></p>
                 </div>
             </div>
 
             <div class="flex gap-3">
-                <button id="btn-toggle" onclick="toggleTracking()" class="flex-[2] bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all">
+                <button id="btn-toggle" onclick="toggleTracking()" class="flex-[2] bg-blue-600 text-white py-5 rounded-2xl font-black text-xl active:scale-95 transition-all">
                     <span id="btn-text">START</span>
                 </button>
                 <button id="btn-pause" onclick="togglePause()" class="hidden flex-1 bg-gray-700 text-white py-5 rounded-2xl font-black text-xs active:scale-95 transition-all">
@@ -68,18 +50,26 @@
             </div>
         </div>
 
+        <div class="bg-gray-800/40 border border-gray-700/30 rounded-2xl p-4 mb-6">
+            <p class="text-[10px] text-gray-500 font-black uppercase mb-2">Monthly Goal Progress</p>
+            <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden">
+                <div id="goal-bar" class="bg-blue-500 h-full w-0 transition-all duration-1000"></div>
+            </div>
+        </div>
+
         <div id="history-list" class="space-y-3"></div>
     </div>
 
     <script>
-        let runs = JSON.parse(localStorage.getItem('cyberRunDataV4')) || [];
+        let runs = JSON.parse(localStorage.getItem('cyberRunDataV5')) || [];
         let isTracking = false, isPaused = false;
         let watchId, startTime, timerInterval, totalDistance = 0, lastPosition = null;
-        let pausedTime = 0, pauseStartTime = 0;
+        let pausedTime = 0, pauseStartTime = 0, lastLapDistance = 0;
+        let wakeLock = null;
         
         const synth = window.speechSynthesis;
 
-        window.onload = () => { renderHistory(); startGpsTracker(); };
+        window.onload = () => { renderHistory(); updateStats(); startGpsTracker(); };
 
         function speak(text) {
             if (synth.speaking) synth.cancel();
@@ -89,7 +79,16 @@
             synth.speak(utter);
         }
 
-        // GPS監視を常にバックグラウンドで開始（精度確認のため）
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        }
+
         function startGpsTracker() {
             if (!navigator.geolocation) return;
             watchId = navigator.geolocation.watchPosition(handlePosition, 
@@ -100,40 +99,24 @@
 
         function handlePosition(position) {
             const { latitude, longitude, accuracy, timestamp } = position.coords;
-            
-            // UIの精度表示を更新
-            const accLight = document.getElementById('accuracy-light');
-            const accText = document.getElementById('accuracy-text');
-            if (accuracy < 15) {
-                accLight.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]";
-                accText.innerText = "GPS SIGNAL: EXCELLENT";
-            } else if (accuracy < 30) {
-                accLight.className = "w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_#eab308]";
-                accText.innerText = "GPS SIGNAL: GOOD";
-            } else {
-                accLight.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]";
-                accText.innerText = "GPS SIGNAL: WEAK";
-            }
+            document.getElementById('accuracy-text').innerText = `GPS: ACCURACY ${Math.round(accuracy)}M`;
 
-            if (!isTracking || isPaused) return;
-
-            // --- 高精度フィルタリングアルゴリズム ---
-            if (accuracy > 25) return; // 精度が25m以下のデータはノイズとして破棄
+            if (!isTracking || isPaused || accuracy > 30) return;
 
             if (lastPosition) {
-                const timeDiff = (timestamp - lastPosition.timestamp) / 1000; // 秒
                 const dist = calculateDistance(lastPosition.latitude, lastPosition.longitude, latitude, longitude);
-                
-                // 1. 静止時のドリフト防止（5メートル以下の移動は無視）
                 if (dist < 0.005) return;
-
-                // 2. 異常速度フィルタ（時速30km以上の移動はGPSのジャンプとみなす）
-                const speedKmh = (dist / (timeDiff / 3600));
-                if (speedKmh > 30) return;
 
                 totalDistance += dist;
                 document.getElementById('live-dist').innerText = totalDistance.toFixed(2);
                 
+                // --- オートラップ機能 (1kmごと) ---
+                if (Math.floor(totalDistance) > Math.floor(lastLapDistance)) {
+                    lastLapDistance = totalDistance;
+                    const currentPace = document.getElementById('live-pace').innerText;
+                    speak(`${Math.floor(totalDistance)}キロ通過。現在のペースは${currentPace}です。`);
+                }
+
                 const timeElapsedMin = ((Date.now() - startTime) - pausedTime) / 60000;
                 const pace = timeElapsedMin / totalDistance;
                 document.getElementById('live-pace').innerText = `${Math.floor(pace)}'${Math.round((pace%1)*60).toString().padStart(2,'0')}"`;
@@ -141,24 +124,27 @@
             lastPosition = { latitude, longitude, timestamp };
         }
 
-        function toggleTracking() {
+        async function toggleTracking() {
             if (!isTracking) {
-                speak("ワークアウトを開始します。");
-                isTracking = true; isPaused = false;
-                totalDistance = 0; lastPosition = null; startTime = Date.now(); pausedTime = 0;
-                timerInterval = setInterval(() => {
-                    const diff = (Date.now() - startTime) - pausedTime;
-                    const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-                    const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-                    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    document.getElementById('timer-display').innerText = `${h}:${m}:${s}`;
-                }, 1000);
+                await requestWakeLock();
+                speak("ワークアウトを開始します。画面を消しても計測を続けます。");
+                isTracking = true; totalDistance = 0; lastLapDistance = 0; startTime = Date.now(); pausedTime = 0;
+                timerInterval = setInterval(updateTimer, 1000);
                 document.getElementById('btn-text').innerText = "FINISH";
                 document.getElementById('btn-toggle').classList.replace('bg-blue-600', 'bg-red-500');
                 document.getElementById('btn-pause').classList.remove('hidden');
             } else {
+                releaseWakeLock();
                 stopSession();
             }
+        }
+
+        function updateTimer() {
+            const diff = (Date.now() - startTime) - pausedTime;
+            const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+            const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+            const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${h}:${m}:${s}`;
         }
 
         function togglePause() {
@@ -166,45 +152,46 @@
             if (!isPaused) {
                 isPaused = true; pauseStartTime = Date.now();
                 btnPause.innerText = "RESUME";
-                btnPause.classList.replace('bg-gray-700', 'bg-blue-600');
                 speak("一時停止します。");
             } else {
                 isPaused = false; pausedTime += (Date.now() - pauseStartTime);
                 btnPause.innerText = "PAUSE";
-                btnPause.classList.replace('bg-blue-600', 'bg-gray-700');
                 speak("再開します。");
             }
         }
 
         function stopSession() {
             clearInterval(timerInterval);
-            const durationMs = (Date.now() - startTime) - pausedTime;
-            if (totalDistance > 0.02) {
+            if (totalDistance > 0.01) {
                 const now = new Date();
                 const dateStr = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
-                runs.unshift({ id: Date.now(), date: dateStr, distance: totalDistance, duration: durationMs/60000, pace: (durationMs/60000)/totalDistance });
-                localStorage.setItem('cyberRunDataV4', JSON.stringify(runs));
-                renderHistory();
-                speak(`計測完了。${totalDistance.toFixed(2)}キロ走りました。`);
+                runs.unshift({ id: Date.now(), date: dateStr, distance: totalDistance, duration: ((Date.now()-startTime)-pausedTime)/60000, pace: (((Date.now()-startTime)-pausedTime)/60000)/totalDistance });
+                localStorage.setItem('cyberRunDataV5', JSON.stringify(runs));
+                renderHistory(); updateStats();
+                speak(`計測完了。${totalDistance.toFixed(2)}キロ。保存しました。`);
             }
-            isTracking = false;
+            isTracking = false; isPaused = false;
             document.getElementById('btn-text').innerText = "START";
             document.getElementById('btn-toggle').classList.replace('bg-red-500', 'bg-blue-600');
             document.getElementById('btn-pause').classList.add('hidden');
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; 
+            const R = 6371;
             const dLat = (lat2-lat1)*Math.PI/180;
             const dLon = (lon2-lon1)*Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        function updateStats() {
+            const monthDist = runs.reduce((s, r) => s + r.distance, 0);
+            document.getElementById('goal-bar').style.width = Math.min((monthDist/100)*100, 100) + '%';
+        }
+
         function copyForGemini() {
-            const dataString = runs.slice(0, 10).map(r => `- ${r.date}: ${r.distance.toFixed(2)}km, ${Math.floor(r.pace)}'${Math.round((r.pace%1)*60)}"/km`).join('\n');
-            const prompt = `以下の私のランニングデータを分析してアドバイスをください：\n${dataString}`;
-            navigator.clipboard.writeText(prompt).then(() => alert("Gemini用プロンプトをコピーしました！"));
+            const dataString = runs.slice(0, 5).map(r => `- ${r.date}: ${r.distance.toFixed(2)}km, ${Math.floor(r.pace)}'${Math.round((r.pace%1)*60)}"/km`).join('\n');
+            navigator.clipboard.writeText(`最近のランを分析して：\n${dataString}`).then(() => alert("Gemini用プロンプトをコピー！"));
         }
 
         function renderHistory() {
@@ -212,13 +199,18 @@
             list.innerHTML = runs.map(run => `
                 <div class="bg-gray-800/40 border border-gray-700/30 rounded-2xl p-4 flex justify-between items-center">
                     <div>
-                        <p class="text-[9px] text-gray-500 font-bold uppercase">${run.date}</p>
-                        <p class="text-lg font-black text-white font-mono-digit">${run.distance.toFixed(2)}<span class="text-[10px] ml-1 text-gray-500">KM</span></p>
+                        <p class="text-[9px] text-gray-500 font-bold">${run.date}</p>
+                        <p class="text-lg font-black text-white font-mono-digit">${run.distance.toFixed(2)}<span class="text-[10px] ml-1 text-gray-400">KM</span></p>
                     </div>
                     <p class="text-sm font-black text-cyan-400 font-mono-digit">${Math.floor(run.pace)}'${Math.round((run.pace%1)*60).toString().padStart(2,'0')}"</p>
                 </div>
             `).join('');
         }
+
+        // アプリ復帰時にスリープ防止を再適用
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
+        });
     </script>
 </body>
 </html>
