@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Run Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: { 900: '#111827', 800: '#1f2937', 700: '#374151' },
+                        blue: { 500: '#3b82f6', 600: '#2563eb' }
+                    },
+                    boxShadow: {
+                        'neon': '0 0 20px rgba(59, 130, 246, 0.6)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #e5e7eb; }
+        /* 数字用フォント */
+        .font-mono-digit { font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', monospace; }
+    </style>
+</head>
+<body class="p-4 min-h-screen flex justify-center">
+
+    <div class="w-full max-w-md">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">
+                CYBER RUN
+            </h1>
+            <span class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">PRO EDITION</span>
+        </header>
+
+        <div id="tracker-card" class="bg-gray-800 rounded-3xl p-8 mb-8 shadow-xl text-center border-2 border-transparent transition-all duration-300">
+            <p class="text-xs font-medium text-gray-400 tracking-widest uppercase mb-2">Current Session</p>
+            <div id="timer-display" class="font-mono-digit text-5xl font-black text-white mb-4 tracking-wider" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">
+                00:00:00
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-gray-700/50 p-3 rounded-2xl">
+                    <p class="text-[10px] text-gray-400 uppercase mb-1">Distance</p>
+                    <p class="text-2xl font-bold font-mono-digit text-blue-400"><span id="live-dist">0.00</span> <span class="text-sm">km</span></p>
+                </div>
+                <div class="bg-gray-700/50 p-3 rounded-2xl">
+                    <p class="text-[10px] text-gray-400 uppercase mb-1">Current Pace</p>
+                    <p class="text-xl font-bold font-mono-digit text-teal-400"><span id="live-pace">-'-"</span></p>
+                </div>
+            </div>
+
+            <button id="btn-toggle" onclick="toggleTracking()" class="w-full relative overflow-hidden group bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95">
+                <span class="relative z-10">START RUN</span>
+                <div class="absolute inset-0 h-full w-full bg-white/20 scale-0 group-hover:scale-100 transition-transform rounded-2xl duration-300"></div>
+            </button>
+            <p id="gps-status" class="text-[10px] text-gray-500 mt-3 flex items-center justify-center">
+                <span class="inline-block w-2 h-2 bg-gray-500 rounded-full mr-2" id="gps-indicator"></span>
+                <span>Ready to track</span>
+            </p>
+        </div>
+
+        <div class="bg-gray-800/80 backdrop-blur-sm rounded-3xl p-6 mb-6 shadow-lg border border-gray-700">
+            <h2 class="text-sm font-bold text-gray-300 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H4zM2 13a1 1 0 011-1h14a1 1 0 110 2H2z" /></svg>
+                SAVE ACTIVITY
+            </h2>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <input type="date" id="date" class="bg-gray-900 border border-gray-700 text-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <input type="number" id="distance" step="0.01" placeholder="距離 (km)" class="bg-gray-900 border border-gray-700 text-gray-300 p-3 rounded-xl text-sm font-mono-digit focus:ring-2 focus:ring-blue-500 outline-none">
+                <input type="number" id="duration-min" placeholder="時間 (分)" class="bg-gray-900 border border-gray-700 text-gray-300 p-3 rounded-xl text-sm font-mono-digit col-span-2 focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <button onclick="saveRecord()" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl text-sm font-bold transition-colors">
+                履歴に記録する
+            </button>
+        </div>
+
+        <h2 class="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Recent Activity</h2>
+        <div id="history-list" class="space-y-3 pb-12"></div>
+    </div>
+
+    <script>
+        let runs = JSON.parse(localStorage.getItem('runningRecordsPro')) || [];
+        let isTracking = false;
+        let watchId, startTime, timerInterval;
+        let totalDistance = 0;
+        let lastPosition = null;
+        // 音声合成の準備
+        const synth = window.speechSynthesis;
+
+        window.onload = () => {
+            document.getElementById('date').valueAsDate = new Date();
+            renderHistory();
+        };
+
+        // 音声で話す関数
+        function speak(text) {
+            if (synth.speaking) { console.error('speechSynthesis.speaking'); return; }
+            if (text !== '') {
+                const utterThis = new SpeechSynthesisUtterance(text);
+                utterThis.lang = 'ja-JP'; // 日本語設定
+                utterThis.rate = 1.0; // 速度
+                utterThis.pitch = 1.0; // 高さ
+                synth.speak(utterThis);
+            }
+        }
+
+        function toggleTracking() {
+            const btn = document.getElementById('btn-toggle');
+            const btnText = btn.querySelector('span');
+            const card = document.getElementById('tracker-card');
+            const gpsIndicator = document.getElementById('gps-indicator');
+
+            if (!isTracking) {
+                // 開始処理
+                if (!navigator.geolocation) return alert("GPS非対応ブラウザです");
+                
+                speak("計測を開始します。"); // 音声アナウンス
+
+                startSession();
+                btnText.innerText = "STOP RUN";
+                btn.classList.remove('from-blue-500', 'to-blue-600', 'hover:from-blue-600', 'hover:to-blue-700');
+                btn.classList.add('from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700');
+                card.classList.add('border-blue-500', 'shadow-neon'); // 発光エフェクト
+                gpsIndicator.classList.replace('bg-gray-500', 'bg-green-500');
+                gpsIndicator.classList.add('animate-pulse');
+            } else {
+                // 終了処理
+                stopSession();
+                
+                speak("計測を終了しました。お疲れ様でした。"); // 音声アナウンス
+
+                btnText.innerText = "START RUN";
+                btn.classList.remove('from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700');
+                btn.classList.add('from-blue-500', 'to-blue-600', 'hover:from-blue-600', 'hover:to-blue-700');
+                card.classList.remove('border-blue-500', 'shadow-neon');
+                gpsIndicator.classList.replace('bg-green-500', 'bg-gray-500');
+                gpsIndicator.classList.remove('animate-pulse');
+            }
+            isTracking = !isTracking;
+        }
+
+        function startSession() {
+            totalDistance = 0;
+            lastPosition = null;
+            startTime = Date.now();
+            document.getElementById('live-dist').innerText = "0.00";
+            document.getElementById('live-pace').innerText = "-'-" + '"';
+            
+            timerInterval = setInterval(updateTimer, 1000);
+
+            watchId = navigator.geolocation.watchPosition(updatePosition, 
+                (err) => {
+                    console.error(err);
+                    document.getElementById('gps-status').querySelector('span:last-child').innerText = "GPSエラー: " + err.message;
+                }, 
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+            document.getElementById('gps-status').querySelector('span:last-child').innerText = "GPS信号を受信中...";
+        }
+
+        function stopSession() {
+            clearInterval(timerInterval);
+            navigator.geolocation.clearWatch(watchId);
+            
+            const durationMs = Date.now() - startTime;
+            const durationMin = (durationMs / 60000);
+
+            document.getElementById('distance').value = totalDistance.toFixed(2);
+            document.getElementById('duration-min').value = durationMin.toFixed(0);
+            document.getElementById('gps-status').querySelector('span:last-child').innerText = "セッション完了";
+        }
+
+        function updateTimer() {
+            const diff = Date.now() - startTime;
+            const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+            const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+            const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${h}:${m}:${s}`;
+        }
+
+        function updatePosition(position) {
+            const { latitude, longitude, accuracy } = position.coords;
+             // 精度インジケータ更新
+             const gpsStatusText = document.getElementById('gps-status').querySelector('span:last-child');
+            if(accuracy < 20) {
+                 gpsStatusText.innerText = `GPS捕捉中 (精度: 高)`;
+                 gpsStatusText.classList.add('text-green-400');
+            } else {
+                 gpsStatusText.innerText = `GPS捕捉中 (精度: 低 ±${Math.round(accuracy)}m)`;
+                 gpsStatusText.classList.remove('text-green-400');
+            }
+
+            if (accuracy > 40) return; // 精度が悪いデータは無視
+
+            if (lastPosition) {
+                const dist = calculateDistance(lastPosition.latitude, lastPosition.longitude, latitude, longitude);
+                totalDistance += dist;
+                document.getElementById('live-dist').innerText = totalDistance.toFixed(2);
+
+                // 現在のペース計算 (直近の移動に基づく簡易計算)
+                const timeElapsedMin = (Date.now() - startTime) / 60000;
+                if(totalDistance > 0.1 && timeElapsedMin > 0) {
+                     const currentPace = timeElapsedMin / totalDistance;
+                     const pMin = Math.floor(currentPace);
+                     const pSec = Math.round((currentPace - pMin) * 60).toString().padStart(2, '0');
+                     document.getElementById('live-pace').innerText = `${pMin}'${pSec}"`;
+                }
+            }
+            lastPosition = { latitude, longitude };
+        }
+
+        // ハバーシン公式 (距離計算)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        function toRad(deg) { return deg * (Math.PI/180); }
+
+
+        function saveRecord() {
+            const date = document.getElementById('date').value;
+            const distance = parseFloat(document.getElementById('distance').value);
+            const duration = parseFloat(document.getElementById('duration-min').value);
+
+            if (!date || isNaN(distance) || isNaN(duration) || distance === 0) return alert("有効な距離と時間を入力してください");
+
+            const pace = duration / distance;
+            runs.unshift({ id: Date.now(), date, distance, duration, pace });
+            localStorage.setItem('runningRecordsPro', JSON.stringify(runs));
+            renderHistory();
+            
+            // 保存完了の小さな音声フィードバック
+            speak("記録を保存しました");
+        }
+
+        function deleteRecord(id) {
+            if(!confirm("この記録を削除しますか？")) return;
+            runs = runs.filter(r => r.id !== id);
+            localStorage.setItem('runningRecordsPro', JSON.stringify(runs));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = runs.map(run => {
+                const pMin = Math.floor(run.pace);
+                const pSec = Math.round((run.pace - pMin) * 60).toString().padStart(2, '0');
+                return `
+                    <div class="bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-700 flex justify-between items-center hover:border-gray-600 transition-colors">
+                        <div class="flex items-center">
+                            <div class="bg-blue-900/50 p-3 rounded-xl mr-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 mb-1">${run.date}</p>
+                                <p class="font-black text-lg text-white font-mono-digit">${run.distance.toFixed(2)} <span class="text-sm font-normal text-gray-400">km</span></p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-teal-400 font-mono-digit mb-1">${pMin}'${pSec}"<span class="text-xs">/km</span></p>
+                            <p class="text-xs text-gray-500 mb-2">${run.duration.toFixed(0)} min</p>
+                            <button onclick="deleteRecord(${run.id})" class="text-[10px] text-red-400 hover:text-red-300 py-1 px-2 rounded bg-red-900/20">DELETE</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>
